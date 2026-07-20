@@ -3703,10 +3703,15 @@ function runMigrations(db: Database.Database): void {
     },
 
     // Expense Categories chart (#Chart.js integration) needs a category on each
-    // withdrawal. Guarded because schema.ts's CREATE TABLE IF NOT EXISTS already
-    // includes this column for anyone who hasn't created wallet_transactions yet;
-    // this only fires for a DB where that table exists without it.
+    // withdrawal. The wallet_transactions table was later retired (moved to
+    // Firestore — see schema.ts), so on a fresh install it never exists. Guard on
+    // the table existing first: the ALTER only fires for a legacy DB that still
+    // carries the pre-Firestore table without the category column.
     () => {
+      const tableExists = db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'wallet_transactions'")
+        .get();
+      if (!tableExists) return;
       const hasCategory = db
         .prepare("SELECT 1 FROM pragma_table_info('wallet_transactions') WHERE name = 'category'")
         .get();
