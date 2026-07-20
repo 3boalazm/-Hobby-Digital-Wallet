@@ -26,7 +26,14 @@ export const useSystemNoticeStore = create<SystemNoticeState>()((set, get) => ({
     set({ fetching: true });
     try {
       const res = await axios.get('/system-notices/active');
-      const notices = parseInDev(systemNoticeDtoSchema.array(), res.data, 'systemNotices.fetch');
+      const parsed = parseInDev(systemNoticeDtoSchema.array(), res.data, 'systemNotices.fetch');
+      // parseInDev only *warns* on drift (dev) and otherwise passes the payload
+      // straight through, so a non-array body — a PWA/service-worker offline
+      // fallback returning index.html, a proxy error page, an unexpected object —
+      // would flow into state and make every `notices.filter(...)` in the
+      // SystemNotices host throw, crashing the whole app. Enforce the array
+      // invariant here so consumers can rely on it.
+      const notices = Array.isArray(parsed) ? parsed : [];
       set({ notices, loaded: true, fetching: false });
     } catch (err) {
       // Notices are non-critical. Fail silently; set loaded so UI doesn't hang.
